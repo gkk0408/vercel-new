@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const { WebSocketServer } = require('ws');
 const crypto = require('crypto');
 
@@ -9,17 +10,19 @@ let espSocket = null;
 const pendingRequests = new Map();
 app.use(express.raw({ type: '*/*', limit: '10mb' }));
 
-// Create the WebSocket server instance without binding to a static port
-const wss = new WebSocketServer({ noServer: true });
+// 1. Create a native HTTP server wrapping Express
+const server = http.createServer(app);
 
-wss.on('connection', (ws) => {
-    console.log('[SYSTEM] ESP8266 connected over WebSocket.');
+// 2. Attach WebSocket Server to that exact instance
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws, req) => {
+    console.log('[SYSTEM] ESP8266 successfully established WebSocket tunnel.');
     espSocket = ws;
 
     ws.on('message', (message) => {
         try {
             const rawString = message.toString();
-
             if (rawString === '{"type":"ping"}') {
                 ws.send(JSON.stringify({ type: 'pong' }));
                 return;
@@ -49,11 +52,11 @@ wss.on('connection', (ws) => {
     });
 });
 
-// Handle incoming HTTP requests from your browser/client
+// 3. Update the route scanner to step aside for WebSocket requests
 app.all('*', (req, res) => {
-    // If it's a WebSocket upgrade request targetting /esp-bridge
+    // CRITICAL: Let WebSocket handshake pass through without security checks
     if (req.headers.upgrade && req.headers.upgrade.toLowerCase() === 'websocket') {
-        return; // Handled by the upgrade event listener below
+        return; 
     }
 
     const providedKey = req.query.key;
@@ -78,5 +81,5 @@ app.all('*', (req, res) => {
     }, 15000);
 });
 
-// Export the app instance for Vercel's serverless launcher
-module.exports = app;
+// CRITICAL FOR VERCEL WEBSOCKETS: Export the server instance
+module.exports = server;
