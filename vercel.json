@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "deploymentProtection": {
-    "unprotectedPaths": ["/cmd"]
-  },
   "routes": [
     {
       "src": "/(.*)",
